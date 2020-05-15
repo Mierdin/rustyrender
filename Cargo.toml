@@ -12,3 +12,6 @@ rand = "0.7.3"
 num-complex = "0.2.4"
 tobj = "2.0.0"
 log = "0.4.8"
+
+[profile.dev]
+debug = true

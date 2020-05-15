@@ -2,20 +2,13 @@
 extern crate image;
 extern crate num_complex;
 extern crate tobj;
+extern crate rustyrender;
 
 use image::GenericImageView;
 use image::{ImageBuffer, Pixel, Rgb};
 use std::fs::File;
 use std::io::BufReader;
-
-const WHITE: Rgb<u8> = image::Rgb([255, 255, 255]);
-const BLACK: Rgb<u8> = image::Rgb([0, 0, 0]);
-const RED: Rgb<u8> = image::Rgb([255, 0, 0]);
-const BLUE: Rgb<u8> = image::Rgb([0, 0, 255]);
-
-// Creating a single value for controlling scale. This sets the dimensions of the imagebuffer,
-// but is also used to determine how often to draw a pixel, and for how long
-const SCALE: u32 = 1000;
+use rustyrender::{line,background,SCALE,WHITE,RED,BLACK,BLUE};
 
 fn main() {
 
@@ -69,49 +62,4 @@ fn main() {
     }
     imgbuf.save("head.png").unwrap();
 
-}
-
-// This was my first test of the line() function, by passing in explicit coordinates to the function call.
-fn simple_lines() {
-
-    let mut imgbuf = image::ImageBuffer::new(SCALE, SCALE);
-
-    imgbuf = background(WHITE, imgbuf);
-
-    // TODO(mierdin): Currently there is nothing preventing us from passing in a value > SCALE
-    // and panicking, here, or in the obj draw code above
-    imgbuf = line(20.0, 20.0, 20.0, 840.0, BLACK, imgbuf);
-    imgbuf = line(500.0, 304.0, 890.0, 40.0, RED, imgbuf);
-    imgbuf = line(50.0, 50.0, 800.0, 800.0, BLUE, imgbuf);
-
-    imgbuf.save("line.png").unwrap();
-
-}
-
-// TODO(mierdin): it wasn't enough to provide ImageBuffer, we had to provide the typs after as well. Why?
-// https://stackoverflow.com/questions/35488820/how-to-create-a-rust-struct-with-an-imageimagebuffer-as-a-member
-// Also, I originally had no return type, which meant that anything after this function call lost ownership of imgbuf. Had to return it to pass back ownership.
-fn line(x0: f32, y0: f32, x1: f32, y1: f32, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>>{
-
-    debug!("Writing line from {},{} to {},{}", x0, y0, x1, y1);
-
-    for t in 0..SCALE {
-        let t = t as f32 * (1.0 / SCALE as f32);
-        let x = x0 + (x1 - x0) * t;
-        let y = y0 + (y1 - y0) * t;
-
-        imgbuf.put_pixel(x as u32, y as u32, color);
-    }
-
-    imgbuf
-
-}
-
-// Writes all pixels in an image buffer with the same color
-fn background(color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    for (_x, _y, pixel) in imgbuf.enumerate_pixels_mut() {
-        *pixel = color;
-    }
-
-    imgbuf
 }

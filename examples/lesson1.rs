@@ -8,7 +8,7 @@ use image::GenericImageView;
 use image::{ImageBuffer, Pixel, Rgb};
 use std::fs::File;
 use std::io::BufReader;
-use rustyrender::{line,background,SCALE,WHITE,RED,BLACK,BLUE};
+use rustyrender::{line, background, SCALE, WHITE, RED, BLACK, BLUE, Vec2f};
 
 fn main() {
 
@@ -55,7 +55,10 @@ fn main() {
             let v1y = (v1_y_raw + 1.0) * SCALE as f32 / 2.0;
             debug!("v0x={}, v0y={}, v1x={}, v1y={}", v0x, v0y, v1x, v1y);
 
-            imgbuf = line(v0x, v0y, v1x, v1y, WHITE, imgbuf);
+            let v0 = Vec2f::new(v0x, v0y);
+            let v1 = Vec2f::new(v1x, v1y);
+
+            imgbuf = line(v0, v1, WHITE, imgbuf);
 
         }
         next_face = end;

@@ -3,20 +3,25 @@ extern crate image;
 extern crate num_complex;
 extern crate tobj;
 
+use std::ops::{Sub, Add, Mul};
+use std::fmt::Display;
+
 use image::{ImageBuffer, Rgb};
 
 pub const WHITE: Rgb<u8> = image::Rgb([255, 255, 255]);
 pub const BLACK: Rgb<u8> = image::Rgb([0, 0, 0]);
 pub const RED: Rgb<u8> = image::Rgb([255, 0, 0]);
+pub const GREEN: Rgb<u8> = image::Rgb([0, 255, 0]);
 pub const BLUE: Rgb<u8> = image::Rgb([0, 0, 255]);
 
 // Creating a single value for controlling scale. This sets the dimensions of the imagebuffer,
 // but is also used to determine how often to draw a pixel, and for how long
 pub const SCALE: u32 = 1000;
 
+#[derive(Copy, Clone, Debug)]
 pub struct Vec2f {
-    x: f32,
-    y: f32
+    pub x: f32,
+    pub y: f32
 }
 
 impl Vec2f {
@@ -24,6 +29,43 @@ impl Vec2f {
         Vec2f { x: x, y: y }
     }
 }
+
+impl Sub for Vec2f {
+    type Output = Vec2f;
+
+    fn sub(self, other: Vec2f) -> Vec2f {
+        Vec2f {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+impl Add for Vec2f {
+    type Output = Vec2f;
+
+    fn add(self, other: Vec2f) -> Vec2f {
+        Vec2f {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Vec3f {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32
+}
+
+impl Vec3f {
+    pub fn new(x: f32, y: f32, z: f32) -> Vec3f {
+        Vec3f { x: x, y: y, z: z }
+    }
+}
+
+
 
 // TODO(mierdin): it wasn't enough to provide ImageBuffer, we had to provide the typs after as well. Why?
 // https://stackoverflow.com/questions/35488820/how-to-create-a-rust-struct-with-an-imageimagebuffer-as-a-member

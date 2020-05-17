@@ -3,6 +3,9 @@ extern crate image;
 extern crate num_complex;
 extern crate tobj;
 extern crate rustyrender;
+extern crate rand;
+
+use rand::Rng;
 
 use std::mem;
 use std::cmp;
@@ -14,12 +17,77 @@ use std::io::BufReader;
 use rustyrender::{line, background, SCALE, WHITE, RED, BLACK, BLUE, GREEN, Vec2f, Vec3f};
 
 fn main() {
-    let mut imgbuf = image::ImageBuffer::new(200, 200);
+    // let mut imgbuf = image::ImageBuffer::new(1000, 1000);
+    // imgbuf = background(BLACK, imgbuf);
+    // let pts: Vec<Vec2f> = vec![Vec2f::new(10.0, 10.0), Vec2f::new(100.0, 30.0), Vec2f::new(190.0, 160.0)];
+
+
+    let (models, materials) = tobj::load_obj("african_head.obj", false).expect("Failed to load file");
+
+    debug!("# of models: {}", models.len());
+    debug!("# of materials: {}", materials.len());
+
+    let mesh = &models[0].mesh;
+
+    let mut imgbuf = image::ImageBuffer::new(SCALE+1, SCALE+1);
     imgbuf = background(BLACK, imgbuf);
-    let pts: Vec<Vec2f> = vec![Vec2f::new(10.0, 10.0), Vec2f::new(100.0, 30.0), Vec2f::new(190.0, 160.0)];
-    imgbuf = triangle(pts, RED, imgbuf); 
-    imgbuf = imageops::flip_vertical(&imgbuf);
-    imgbuf.save("triangles.png").unwrap();
+
+    // num_face_indices is just a vector which stores the number of indices used by each face.
+    // We can iterate over this to figure out how many indices we should include in the slice of mesh.indices
+    let mut next_face = 0;
+    for f in 0..mesh.num_face_indices.len() {
+
+        let end = next_face + mesh.num_face_indices[f] as usize;
+
+        // face_indices is a vector containing the index for three vertices that make up a face
+        let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
+        debug!("    face[{}] = {:?}", f, face_indices);
+
+        let mut screen_coords: Vec<Vec2f> = Vec::with_capacity(3);
+
+        // Loop through the three sides of the face
+        for j in 0..3 {
+
+            let world_coords = Vec3f::new(
+                -mesh.positions[3 * *face_indices[j] as usize],
+                -mesh.positions[3 * (*face_indices[j] as usize)+1],
+                -mesh.positions[3 * (*face_indices[j] as usize)+2]
+            );
+
+            // TODO(mierdin): Dynamically retrieve width/height (ran into borrowing)
+            // screen_coords[j] = Vec2f::new((world_coords.x+1.0)*200 as f32/2.0, (world_coords.y+1.0)*200 as f32/2.);
+            screen_coords.push(Vec2f::new((world_coords.x+1.0)*1000 as f32/2.0, (world_coords.y+1.0)*1000 as f32/2.));
+
+
+        }
+
+        let mut rng = rand::thread_rng();
+        let rndcolor: Rgb<u8> = image::Rgb([rng.gen_range(0, 255), rng.gen_range(0, 255), rng.gen_range(0, 255)]);
+        println!("COLOR - {:?}", rndcolor);
+        imgbuf = triangle(&screen_coords, rndcolor, imgbuf);
+
+        // for (int i=0; i<model->nfaces(); i++) { 
+        //     std::vector<int> face = model->face(i); 
+        //     Vec2i screen_coords[3]; 
+
+        //     Loop through the three vertices in the face
+        //     for (int j=0; j<3; j++) { 
+        //         Vec3f world_coords = model->vert(face[j]); 
+        //         screen_coords[j] = Vec2i((world_coords.x+1.)*width/2., (world_coords.y+1.)*height/2.); 
+        //     } 
+        //     triangle(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(rand()%255, rand()%255, rand()%255, 255)); 
+        // }
+
+        next_face = end;
+    }
+
+
+
+
+
+    // imgbuf = triangle(pts, RED, imgbuf); 
+    // imgbuf = imageops::flip_vertical(&imgbuf);
+    imgbuf.save("head_fill.png").unwrap();
 }
 
 
@@ -95,13 +163,13 @@ fn barycentric(pts: &Vec<Vec2f>, P: &Vec2f) -> Vec3f {
     // TODO(mierdin): This is the original statement from the C++ code. This **may** not be needed, but it still works, so /shrug
     if u.z.abs()<1.0 { return Vec3f::new(-1.0,1.0,1.0) };
     let ret = Vec3f::new(1.0-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
-    println!("Barycentric is returning: {:?}", ret);
+    // println!("Barycentric is returning: {:?}", ret);
 
     ret
 }
 
 
-fn triangle(pts: Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+fn triangle(pts: &Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
     let mut bboxmin = Vec2f::new((imgbuf.width()-1) as f32, (imgbuf.height()-1) as f32);
     let mut bboxmax = Vec2f::new(0.0, 0.0);
@@ -116,21 +184,21 @@ fn triangle(pts: Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Ve
     }
 
     let mut P = Vec2f::new(bboxmin.x, bboxmin.y);
-    println!("bboxmin.x {} | bboxmin.y {}", bboxmin.x, bboxmin.y);
-    println!("bboxmax.x {} | bboxmax.y {}", bboxmax.x, bboxmax.y);
+    // println!("bboxmin.x {} | bboxmin.y {}", bboxmin.x, bboxmin.y);
+    // println!("bboxmax.x {} | bboxmax.y {}", bboxmax.x, bboxmax.y);
     while P.x <= bboxmax.x {
-        println!("P.x {}", P.x);
+        // println!("P.x {}", P.x);
 
         // Reset P.y before each loop
         P.y = bboxmin.y;
         while P.y <= bboxmax.y {
-            println!("P.y {}", P.y);
+            // println!("P.y {}", P.y);
             let bc_screen = barycentric(&pts, &P);
             if bc_screen.x<0.0 || bc_screen.y<0.0 || bc_screen.z<0.0 {
                 P.y += 1.0;
                 continue
             }; 
-            imgbuf.put_pixel(P.x as u32, P.y as u32, RED);
+            imgbuf.put_pixel(P.x as u32, P.y as u32, color);
             P.y += 1.0;
         }
         P.x += 1.0;

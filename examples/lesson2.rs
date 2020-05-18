@@ -17,7 +17,7 @@ use std::io::BufReader;
 
 use rustyrender::{SCALE, WHITE, RED, BLACK, BLUE, GREEN};
 use rustyrender::{Vec2f, Vec3f};
-use rustyrender::{line, background, normalize, dot, cross, triangle, barycentric};
+use rustyrender::{line, background, normalize, triangle, barycentric};
 
 fn main() {
     let (models, materials) = tobj::load_obj("african_head.obj", false).expect("Failed to load file");
@@ -27,7 +27,7 @@ fn main() {
 
     let mesh = &models[0].mesh;
 
-    let mut imgbuf = image::ImageBuffer::new(800+1, 800+1);
+    let mut imgbuf = image::ImageBuffer::new(SCALE+1, SCALE+1);
     imgbuf = background(BLACK, imgbuf);
 
     // num_face_indices is just a vector which stores the number of indices used by each face.
@@ -56,14 +56,14 @@ fn main() {
 
             // TODO(mierdin): Dynamically retrieve width/height (ran into borrowing)
             // screen_coords[j] = Vec2f::new((world_coords.x+1.0)*200 as f32/2.0, (world_coords.y+1.0)*200 as f32/2.);
-            screen_coords.push(Vec2f::new((v.x+1.0)*801 as f32/2.0, (v.y+1.0)*801 as f32/2.));
+            screen_coords.push(Vec2f::new((v.x+1.0)*SCALE as f32/2.0, (v.y+1.0)*SCALE as f32/2.));
 
 
         }
 
 
         // The normal to the triangle can be calculated simply as the cross product of its two sides.
-        let n = cross(world_coords[2]-world_coords[0], world_coords[1]-world_coords[0]);
+        let n = (world_coords[2]-world_coords[0]).cross(world_coords[1]-world_coords[0]);
         // We then have to set the magnitude of this vector to 1.
         let n = normalize(n);
 
@@ -71,7 +71,7 @@ fn main() {
 
         // the intensity of illumination is equal to the scalar product (aka dot product) of the light vector
         // and the normal to the given triangle.
-        let intensity = dot(n, light_dir);
+        let intensity = n.dot(light_dir);
         if  intensity > 0. {
             // TODO(mierdin): This originally had four numbers - Rgba?
             let color: Rgb<u8> = image::Rgb([(intensity*255.0) as u8, (intensity*255.0) as u8, (intensity*255.0) as u8]);

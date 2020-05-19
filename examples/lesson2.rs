@@ -3,21 +3,12 @@ extern crate image;
 extern crate num_complex;
 extern crate tobj;
 extern crate rustyrender;
-extern crate rand;
 
-use rand::Rng;
+use image::Rgb;
 
-use std::mem;
-use std::cmp;
-
-use image::GenericImageView;
-use image::{ImageBuffer, Pixel, Rgb, imageops};
-use std::fs::File;
-use std::io::BufReader;
-
-use rustyrender::{SCALE, WHITE, RED, BLACK, BLUE, GREEN};
+use rustyrender::{SCALE, BLACK};
 use rustyrender::{Vec2f, Vec3f};
-use rustyrender::{line, background, normalize, triangle, barycentric};
+use rustyrender::{background, triangle};
 
 fn main() {
     let (models, materials) = tobj::load_obj("african_head.obj", false).expect("Failed to load file");
@@ -30,6 +21,8 @@ fn main() {
     let mut imgbuf = image::ImageBuffer::new(SCALE+1, SCALE+1);
     imgbuf = background(BLACK, imgbuf);
 
+    let light_dir = Vec3f::new(0.,0.,-1.);
+
     // num_face_indices is just a vector which stores the number of indices used by each face.
     // We can iterate over this to figure out how many indices we should include in the slice of mesh.indices
     let mut next_face = 0;
@@ -41,12 +34,11 @@ fn main() {
         let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
         debug!("    face[{}] = {:?}", f, face_indices);
 
-        let mut screen_coords: Vec<Vec2f> = Vec::with_capacity(3);
-        let mut world_coords: Vec<Vec3f> = Vec::with_capacity(3);
+        let mut screen_coords: Vec<Vec2f> = Vec::with_capacity(3); // Used for rasterization
+        let mut world_coords: Vec<Vec3f> = Vec::with_capacity(3);  // Used for 3d calculations like light intensity
 
         // Loop through the three sides of the face
         for j in 0..3 {
-
             let v = Vec3f::new(
                 -mesh.positions[3 * *face_indices[j] as usize],
                 -mesh.positions[3 * (*face_indices[j] as usize)+1],
@@ -54,26 +46,24 @@ fn main() {
             );
             world_coords.push(v);
 
-            // TODO(mierdin): Dynamically retrieve width/height (ran into borrowing)
-            // screen_coords[j] = Vec2f::new((world_coords.x+1.0)*200 as f32/2.0, (world_coords.y+1.0)*200 as f32/2.);
-            screen_coords.push(Vec2f::new((v.x+1.0)*SCALE as f32/2.0, (v.y+1.0)*SCALE as f32/2.));
-
-
+            screen_coords.push(Vec2f::new(
+                ((v.x+1.0)*SCALE as f32/2.0).round(),  // Rounding screen coordinates to remove gaps between edges
+                ((v.y+1.0)*SCALE as f32/2.0).round()
+            ));
         }
 
+        // To determine which way a face is pointed, we need to get it's normal vector.
+        // This can be calculated by getting the cross product of two of its sides.
+        let mut n = (world_coords[2]-world_coords[0]).cross(world_coords[1]-world_coords[0]);
 
-        // The normal to the triangle can be calculated simply as the cross product of its two sides.
-        let n = (world_coords[2]-world_coords[0]).cross(world_coords[1]-world_coords[0]);
-        // We then have to set the magnitude of this vector to 1.
-        let n = normalize(n);
+        // We also need this vector to be "normalized", which is to set its magnitude to 1
+        n.normalize();
 
-        let light_dir = Vec3f::new(0.,0.,-1.);
-
-        // the intensity of illumination is equal to the scalar product (aka dot product) of the light vector
-        // and the normal to the given triangle.
-        let intensity = n.dot(light_dir);
+        // Next, we calculate the intensity of illumination for this face. This can be derived via
+        // the scalar product (aka dot product) of the light vector and the normal to the given triangle (n).
+        // I am multiplying this by 0.75 to bring the overall brightness down a bit - this is just a personal preference.
+        let intensity = n.dot(light_dir) * 0.85;
         if  intensity > 0. {
-            // TODO(mierdin): This originally had four numbers - Rgba?
             let color: Rgb<u8> = image::Rgb([(intensity*255.0) as u8, (intensity*255.0) as u8, (intensity*255.0) as u8]);
             imgbuf = triangle(&screen_coords, color, imgbuf); 
         }
@@ -81,11 +71,6 @@ fn main() {
         next_face = end;
     }
 
-
-
-
-
-    // imgbuf = triangle(pts, RED, imgbuf); 
     // imgbuf = imageops::flip_vertical(&imgbuf);
     imgbuf.save("head_fill.png").unwrap();
 }

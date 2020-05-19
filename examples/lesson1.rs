@@ -4,11 +4,7 @@ extern crate num_complex;
 extern crate tobj;
 extern crate rustyrender;
 
-use image::GenericImageView;
-use image::{ImageBuffer, Pixel, Rgb};
-use std::fs::File;
-use std::io::BufReader;
-use rustyrender::{line, background, SCALE, WHITE, RED, BLACK, BLUE, Vec2f};
+use rustyrender::{line, background, SCALE, WHITE, BLACK, Vec2f};
 
 fn main() {
 

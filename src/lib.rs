@@ -3,8 +3,7 @@ extern crate image;
 extern crate num_complex;
 extern crate tobj;
 
-use std::ops::{Sub, Add, Mul};
-use std::fmt::Display;
+use std::ops::{Sub, Add};
 
 use image::{ImageBuffer, Rgb};
 
@@ -64,13 +63,20 @@ impl Vec3f {
         Vec3f { x: x, y: y, z: z }
     }
 
-    pub fn normalize(mut self) {
-        self.x = self.x * (1. / (self.x*self.x+self.y*self.y+self.z*self.z).sqrt());
-        self.y = self.y * (1. / (self.x*self.x+self.y*self.y+self.z*self.z).sqrt());
-        self.z = self.z * (1. / (self.x*self.x+self.y*self.y+self.z*self.z).sqrt());
+    pub fn magnitude(self) -> f32 {
+        self.dot(self).sqrt()
     }
 
-    // This function calculuates the cross product of two vectors
+    pub fn normalize(&mut self) {
+        let mag = self.magnitude();
+
+        // http://www.fundza.com/vectors/normalize/
+        self.x = self.x * (1.0 / mag);
+        self.y = self.y * (1.0 / mag);
+        self.z = self.z * (1.0 / mag);
+    }
+
+    // cross returns the cross product of this vector and another vector: "other".
     // http://sites.science.oregonstate.edu/math/home/programs/undergrad/CalculusQuestStudyGuides/vcalc/crossprod/crossprod.html
     pub fn cross(self, other: Vec3f) -> Vec3f {
         return Vec3f::new(self.y*other.z - self.z*other.y, self.z*other.x - self.x*other.z, self.x*other.y - self.y*other.x)
@@ -113,16 +119,6 @@ pub fn line(v0: Vec2f, v1: Vec2f, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8
 
     imgbuf
 
-}
-
-pub fn normalize(v1: Vec3f) -> Vec3f {
-    let retvec = Vec3f::new(
-        v1.x * ( 1.0 / v1.dot(v1)).sqrt(),
-        v1.y * ( 1.0 / v1.dot(v1)).sqrt(),
-        v1.z * ( 1.0 / v1.dot(v1)).sqrt(),
-    );
-
-    retvec
 }
 
 // Writes all pixels in an image buffer with the same color

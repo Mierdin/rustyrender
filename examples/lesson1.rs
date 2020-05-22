@@ -4,7 +4,7 @@ extern crate num_complex;
 extern crate tobj;
 extern crate rustyrender;
 
-use rustyrender::{line, background, SCALE, WHITE, BLACK, Vec2f};
+use rustyrender::{line, background, WHITE, BLACK, Vec2f};
 
 fn main() {
 
@@ -14,6 +14,8 @@ fn main() {
     debug!("# of materials: {}", materials.len());
 
     let mesh = &models[0].mesh;
+
+    let SCALE = 1000;
 
     let mut imgbuf = image::ImageBuffer::new(SCALE+1, SCALE+1);
     imgbuf = background(BLACK, imgbuf);

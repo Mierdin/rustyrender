@@ -2,6 +2,7 @@
 extern crate image;
 extern crate num_complex;
 extern crate tobj;
+use std::mem::swap;
 
 use std::ops::{Sub, Add};
 
@@ -15,7 +16,7 @@ pub const BLUE: Rgb<u8> = image::Rgb([0, 0, 255]);
 
 // Creating a single value for controlling scale. This sets the dimensions of the imagebuffer,
 // but is also used to determine how often to draw a pixel, and for how long
-pub const SCALE: u32 = 1000;
+// pub const SCALE: u32 = 1000;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vec2f {
@@ -109,8 +110,9 @@ pub fn line(v0: Vec2f, v1: Vec2f, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8
 
     debug!("Writing line from {},{} to {},{}", v0.x, v0.y, v1.x, v1.y);
 
-    for t in 0..SCALE {
-        let t = t as f32 * (1.0 / SCALE as f32);
+    // Using width since we're only expecting square dimensions
+    for t in 0..imgbuf.width() {
+        let t = t as f32 * (1.0 / imgbuf.width() as f32);
         let x = v0.x + (v1.x - v0.x) * t;
         let y = v0.y + (v1.y - v0.y) * t;
 
@@ -131,22 +133,22 @@ pub fn background(color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> 
 }
 
 
-pub fn barycentric(pts: &Vec<Vec2f>, P: &Vec2f) -> Vec3f {
-    let u = Vec3f::new(pts[2].x-pts[0].x, pts[1].x-pts[0].x, pts[0].x-P.x).cross(Vec3f::new(pts[2].y-pts[0].y, pts[1].y-pts[0].y, pts[0].y-P.y));
-
+pub fn barycentric(pts: &Vec<Vec3f>, P: &Vec3f) -> Vec3f {
+    let s0 = Vec3f::new(pts[2].x-pts[0].x, pts[1].x-pts[0].x, pts[0].x-P.x);
+    let s1 = Vec3f::new(pts[2].y-pts[0].y, pts[1].y-pts[0].y, pts[0].y-P.y);
+    let u = s0.cross(s1);
     /* `pts` and `P` has integer value as coordinates
        so `abs(u[2])` < 1 means `u[2]` is 0, that means
        triangle is degenerate, in this case return something with negative coordinates */
     // TODO(mierdin): This is the original statement from the C++ code. We're not using integers, so may not run into this
     // problem. However, it doesn't appear to be causing issues by leaving it in.
-    if u.z.abs()<1.0 { return Vec3f::new(-1.0,1.0,1.0) };
-
+    if u.z.abs()<1.0 { 
+        return Vec3f::new(-1.0,1.0,1.0)
+    };
     Vec3f::new(1.0-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z)
 }
 
-
-pub fn triangle(pts: &Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-
+pub fn triangle(pts: &Vec<Vec3f>, zbuffer: &mut Vec<f32>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let mut bboxmin = Vec2f::new((imgbuf.width()-1) as f32, (imgbuf.height()-1) as f32);
     let mut bboxmax = Vec2f::new(0.0, 0.0);
     let clamp = Vec2f::new((imgbuf.width()-1) as f32, (imgbuf.height()-1) as f32);
@@ -159,16 +161,29 @@ pub fn triangle(pts: &Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8
         bboxmax.y = clamp.y.min(bboxmax.y.max(pts[i].y)); 
     }
 
-    let mut P = Vec2f::new(bboxmin.x, bboxmin.y);
+    let mut P = Vec3f::new(bboxmin.x, bboxmin.y, 0.);
     while P.x <= bboxmax.x {
-        P.y = bboxmin.y;  // Important to reset P.y before each loop
+        P.y = bboxmin.y;  // Important to reset P.y here since we're using a while loop
         while P.y <= bboxmax.y {
             let bc_screen = barycentric(&pts, &P);
             if bc_screen.x<0.0 || bc_screen.y<0.0 || bc_screen.z<0.0 {
                 P.y += 1.0;
                 continue
-            }; 
-            imgbuf.put_pixel(P.x as u32, P.y as u32, color);
+            };
+            P.z = 0.;
+            let z = pts[0].z * bc_screen.x + pts[1].z * bc_screen.y + pts[2].z * bc_screen.z;
+            let idx = (P.x + P.y * imgbuf.width() as f32) as usize;
+
+            // If the existing pixel has less depth than the currently proposed one
+            // overwrite the respective zbuffer entry, and place the pixel
+            //
+            // TODO(mierdin): This is reversed from the C++ example, but this is the only way
+            // I could get it working, combined with initializing the zbuffer with positive 2.0
+            // This makes me think I've reversed the Z-axis somewhere.
+            if zbuffer[idx] > z {
+                zbuffer[idx] = z;
+                imgbuf.put_pixel(P.x as u32, P.y as u32, color);
+            }
             P.y += 1.0;
         }
         P.x += 1.0;
@@ -176,3 +191,39 @@ pub fn triangle(pts: &Vec<Vec2f>, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8
 
     imgbuf
 }
+
+pub fn rasterize(p0: &mut Vec2f, p1: &mut Vec2f, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>, ybuffer: &mut Vec<u32>) -> ImageBuffer<Rgb<u8>, Vec<u8>>{
+    if p0.x>p1.x {
+        swap(p0, p1);
+    }
+
+    let mut x = p0.x;
+    while x <= p1.x {
+        let t = (x-p0.x)/(p1.x-p0.x) as f32;
+        let y = p0.y*(1.-t) + p1.y*t;
+        println!("x - {}", x);
+        println!("p1.x - {}", p1.x);
+        println!("len - {}", ybuffer.len());
+        if ybuffer[x as usize] < y as u32 {
+            ybuffer[x as usize] = y as u32;
+            // imgbuf.put_pixel(x as u32, 0, color);
+            for j in 0..16 {
+                imgbuf.put_pixel(x as u32, j, color);
+            }
+        }
+
+        x += 1.;
+    }
+
+    imgbuf
+}
+
+
+
+/*
+
+- Update functions to borrow properly so you don't have to return imgbuf
+- Fix the stupid constant for dimensions, and instead, have the functions retrieve from imgbuf
+
+*/
+

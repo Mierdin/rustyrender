@@ -217,13 +217,3 @@ pub fn rasterize(p0: &mut Vec2f, p1: &mut Vec2f, color: Rgb<u8>, mut imgbuf: Ima
 
     imgbuf
 }
-
-
-
-/*
-
-- Update functions to borrow properly so you don't have to return imgbuf
-- Fix the stupid constant for dimensions, and instead, have the functions retrieve from imgbuf
-
-*/
-

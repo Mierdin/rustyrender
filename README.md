@@ -26,3 +26,26 @@ cargo run --example lesson1
 perf record --call-graph=lbr target/debug/examples/lesson1
 perf report --hierarchy -M intel
 ```
+
+
+## Saved for Later
+
+```rust
+// TODO(mierdin): it wasn't enough to provide ImageBuffer, we had to provide the typs after as well. Why?
+// https://stackoverflow.com/questions/35488820/how-to-create-a-rust-struct-with-an-imageimagebuffer-as-a-member
+// Also, I originally had no return type, which meant that anything after this function call lost ownership of imgbuf. Had to return it to pass back ownership.
+pub fn line(v0: Vec2f, v1: Vec2f, color: Rgb<u8>, mut imgbuf: ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>>{
+
+    debug!("Writing line from {},{} to {},{}", v0.x, v0.y, v1.x, v1.y);
+
+    // Using width since we're only expecting square dimensions
+    for t in 0..imgbuf.width() {
+        let t = t as f32 * (1.0 / imgbuf.width() as f32);
+        let x = v0.x + (v1.x - v0.x) * t;
+        let y = v0.y + (v1.y - v0.y) * t;
+
+        imgbuf.put_pixel(x as u32, y as u32, color);
+    }
+    imgbuf
+}
+```

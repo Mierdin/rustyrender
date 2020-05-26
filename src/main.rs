@@ -21,7 +21,6 @@ TODO
 
 fn main() {
     let scale = 1000;
-    let light_dir = Vec3f::new(0.,0.,-1.);
 
     // MODEL
     // let diffuse = image::open("obj/african_head_diffuse.tga").unwrap().to_rgb();
@@ -65,30 +64,17 @@ fn main() {
             screen_coords.push(v.to_screen(scale as f32));
         }
 
-        let t = Triangle{v0: world_coords[0], v1: world_coords[1], v2: world_coords[2], scale: scale as f32};
+        let mut t = Triangle{
+            v0: world_coords[0],
+            v1: world_coords[1],
+            v2: world_coords[2],
+            scale: scale as f32,
 
-        // Need a render function for each triangle that:
-        /*
-            - gets intensity
-            - gets color (textures)
-            - converts world coords to screen coords
-            - calls draw function
-        */
+            imgbuf: &mut imgbuf,
+            zbuffer: &mut zbuffer
+        };
+        t.render();
 
-        // GET INTENSITY (method for what type though?)
-        // To determine which way a face is pointed, we need to get its normal vector.
-        // This can be calculated by getting the cross product of two of its sides.
-        let mut n = (world_coords[2]-world_coords[0]).cross(world_coords[1]-world_coords[0]);
-        // We also need this vector to be "normalized", which is to set its magnitude to 1
-        n.normalize();
-        // Next, we calculate the intensity of illumination for this face. This can be derived via
-        // the scalar product (aka dot product) of the light vector and the normal to the given triangle (n).
-        // I am multiplying this by a fraction to bring the overall brightness down a bit - this is just a personal preference.
-        let intensity = n.dot(light_dir) * 0.85;
-        if intensity > 0. {
-            let color: Rgb<u8> = image::Rgb([(intensity*255.0 as f32) as u8, (intensity*255.0 as f32) as u8, (intensity*255.0 as f32) as u8]);
-            t.draw(&mut zbuffer, color, &mut imgbuf); 
-        }
         next_face = end;
     }
 
